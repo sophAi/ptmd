@@ -1,0 +1,23 @@
+      subroutine startend(myid,nproc,is1,is2,istart,iend)
+      implicit none
+      integer myid,nproc,is1,is2,istart,iend,iblock,ir,ilength
+      ilength=is2-is1+1
+      iblock=ilength/nproc
+      ir=ilength-iblock*nproc
+      if(myid.eq.0)then
+        istart=is1
+        iend=istart+iblock-1
+      else if(myid.gt.0.and.myid.le.ir) then
+         istart=is1+myid*(iblock+1)-1
+         iend=istart+iblock
+      else if(myid.gt.ir)then
+         istart=is1+myid*iblock+ir
+         iend=istart+iblock-1
+      endif
+      if(ilength.lt.1) then
+         istart=1
+         iend=0
+      endif
+      return
+      end
+

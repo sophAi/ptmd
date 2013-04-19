@@ -1,0 +1,260 @@
+*========================================================================
+* File Name : BIMD_restore.f 
+* Copyright (C) 2008-2011 Po-Jen Hsu <xanadu8850@pchome.com.tw>
+* Creation Date : 19-04-2010
+* Last Modified : 西元2010年08月09日 (週一) 17時09分02秒
+* License : GPL (see bottom)
+* Encoding : utf-8
+* Project : sophAi
+* Description :
+* ========================================================================
+      subroutine BIMD_backup(frame_num)
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/file.h"
+      include "../../include/pes.h"
+      include "../../include/BIMD/BIMD.h"
+      include "../../include/BIMD/BIMD_restore.h"
+      include "../../include/cn/cn.h"
+      integer frame_num
+      real*8 org_pot
+      if(frame_num.le.dint(last_loop))return
+      file_name=BIMD_restore_file(:index(BIMD_restore_file," ")-1)
+      open(21,file=file_name,form="formatted",access="append")
+      write(21,*)
+     &time_label,frame_num,BIMD_rec_interval,init_loop,
+     &final_loop,BIMD_delta_time,
+     &temp,delta_temp,q_dim,atom_num,atom_name_a,atom_num_a,
+     &atom_name_b,atom_num_b
+      write(21,*)
+     &BIMD_ave_energy,BIMD_ave_energy_square,BIMD_ave_pot,
+     &BIMD_ave_kinetic,BIMD_ave_temper,
+     &cn_name
+      write(21,*) (ycp(I0),I0=1,q_dim)
+      write(21,*) (fk0(I0),I0=1,q_dim)
+      write(21,*) (fk1(I0),I0=1,q_dim)
+      write(21,*) (fk2(I0),I0=1,q_dim)
+      write(21,*) (yk0(I0),I0=1,q_dim)
+      write(21,*) (yk1(I0),I0=1,q_dim)
+      write(21,*) (yk2(I0),I0=1,q_dim)
+      write(21,*) (yk3(I0),I0=1,q_dim)
+      do I0=1,atom_num
+        write(21,*)(BIMD_ave_dist(I0,I1),I1=1,atom_num)
+      enddo
+      do I0=1,atom_num
+        write(21,*)(BIMD_ave_dist2(I0,I1),I1=1,atom_num)
+      enddo
+      if(wscreen)then
+        if(cn_prev_name.ne.cn_name)then
+         write(*,"(I5,1x,A5,1x,I13,1x,A40,1x,A80)") 
+     &myid,"Step=",frame_num,". Jump to a new local minimum. Backup to",
+     &BIMD_restore_file
+        else
+          write(*,"(I5,1x,A5,1x,I13,1x,A10,1x,A80)") 
+     &myid,"Step=",frame_num,",Backup to",BIMD_restore_file
+        endif
+      endif
+99    close(21)
+      return
+      end
+
+      subroutine BIMD_restore
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/file.h"
+      include "../../include/BIMD/BIMD.h"
+      include "../../include/BIMD/BIMD_restore.h"
+      include "../../include/cn/cn.h"
+      integer start_frame,loop_line_num
+      real*8 init_loop_org,final_loop_org,rec_interval_org,
+     &init_loop_gap,min_rec_interval,BIMD_delta_time_vel,final_loop_vel
+      parameter(min_rec_interval=5.D3,BIMD_delta_time_vel=0.0001D0,
+     &final_loop_vel=1.D5)
+      real*8 init_loop_bac,final_loop_bac,rec_interval_bac
+      integer record_method_bac
+      loop_line_num=10+2*atom_num
+      last_loop=0.D0
+      init_loop_bac=init_loop
+      init_loop_gap=init_loop
+      final_loop_bac=final_loop
+      rec_interval_bac=BIMD_rec_interval
+      record_method_bac=BIMD_record_method
+C=============================================================================
+      inquire(file=BIMD_restore_file,exist=file_exist)
+      if(file_exist)then
+C===================if BIMD restoring exist====================================
+        if(init_loop_bac.eq.1.D0.and.record_method_bac.eq.1)then
+C===================if init_loop=1 start new BIMD==============================
+          if(wscreen)write(*,"(I5,1x,A16)")
+     &myid,"Start a new BIMD"
+C===================Make velocity stable=======================================
+          if(wscreen)write(*,"(I5,1x,A24)") 
+     &myid,"Start Velocity Stablizer" 
+          init_loop=1.D0
+          final_loop=final_loop_vel
+          a1 = BIMD_delta_time_vel*8.0D0/3.0D0
+          a5 = BIMD_delta_time_vel*3.0D0/8.0D0
+          BIMD_record_method=0
+          call BIMD      
+          a1 = BIMD_delta_time*8.0D0/3.0D0
+          a5 = BIMD_delta_time*3.0D0/8.0D0
+          init_loop=init_loop_bac
+          final_loop=final_loop_bac
+          BIMD_rec_interval=rec_interval_bac
+          BIMD_record_method=record_method_bac
+          call BIMD_init_thermal
+          if(wscreen)write(*,"(I5,1x,A25)") 
+     &myid,"End of Velocity Stablizer"
+          if(BIMD_record_method.eq.1)then
+            call clean_file(BIMD_restore_file)
+            call clean_file(BIMD_restore_history)
+            if(wscreen)write(*,"(I5,1x,A39)")
+     &myid,"Erase all corresponding restoring files"
+          endif
+          return
+        else
+C=================else read BIMD restoring======================================
+          file_name=BIMD_restore_file(:index(BIMD_restore_file," ")-1) 
+          open(23,file=file_name,form="formatted",status="old")
+          read(23,*) time_label,start_frame,rec_interval_org  !read_interval_org and initial start_frame
+          close(23)
+          write(*,*) time_label,start_frame,rec_interval_org 
+          call count_file_line(file_name)
+C          call count_file_line_unformatted(file_name)
+          last_loop=(dble(file_line_num/loop_line_num)-1.D0)*
+     &rec_interval_org
+          if(last_loop.eq.0)last_loop=last_loop+1.D0
+          if(wscreen)write(*,"(I5,1x,A38,1x,F13.1)")
+     &myid,"Backup file exist.Previous final loop=",last_loop
+          if(init_loop_bac.ge.dble(start_frame))then         !the original init_loop >= start_frame of restoring-->jump to the nearest frame
+            if(init_loop_gap.gt.last_loop)init_loop=last_loop
+            if(mod(init_loop,rec_interval_org).eq.0)then   !if init_loop is on the restoring point,init_loop+1
+              init_loop=init_loop-1.D0
+            endif      
+            open(22,file=file_name,form="formatted",status="old")
+            I2=dint(init_loop/rec_interval_org)
+            do I0=1,I2
+              do I1=1,loop_line_num                !loop for jumping
+                read(22,*)              
+              enddo
+            enddo
+C=================read restoring file==========================================
+            read(22,*)
+     &time_label,start_frame,rec_interval_org,init_loop_org,
+     &final_loop_org,BIMD_delta_time,temp,delta_temp,q_dim,
+     7atom_num,atom_name_a,atom_num_a,atom_name_b,atom_num_b
+            read(22,*)
+     &BIMD_ave_energy,BIMD_ave_energy_square,BIMD_ave_pot,
+     &BIMD_ave_kinetic,BIMD_ave_temper
+     &,read_cn_name
+            read(22,*) (ycp(I0),I0=1,q_dim)
+            read(22,*) (fk0(I0),I0=1,q_dim)
+            read(22,*) (fk1(I0),I0=1,q_dim)
+            read(22,*) (fk2(I0),I0=1,q_dim)
+            read(22,*) (yk0(I0),I0=1,q_dim)
+            read(22,*) (yk1(I0),I0=1,q_dim)
+            read(22,*) (yk2(I0),I0=1,q_dim)
+            read(22,*) (yk3(I0),I0=1,q_dim)
+            do I0=1,atom_num
+              read(22,*)(BIMD_ave_dist(I0,I1),I1=1,atom_num)
+            enddo
+            do I0=1,atom_num
+              read(22,*)(BIMD_ave_dist2(I0,I1),I1=1,atom_num)
+            enddo
+            close(22)
+C            if(mod(init_loop_bac,rec_interval_org).eq.0)then   !if init_loop is on the restoring point,init_loop+1
+C              init_loop_bac=init_loop_bac+1.D0
+C            endif
+            if(wscreen)write(*,"(I5,1x,A23,1x,I13)")
+     &myid,"Read restoring point at",start_frame
+          else
+            start_frame=0     !the original init_loop < start frame of restoring -->Start from the beginning to the original init_loop-1
+          endif
+        endif
+        init_loop=dble(start_frame)+1.D0        !Pre BIMD init_loop
+        final_loop=init_loop_bac-1.D0           !pre BIMD final_loop
+        if(init_loop_gap.gt.last_loop)then      !Before init_loop,if init_loop_gap>last_loop,the restoring point need to be added
+          BIMD_rec_interval=rec_interval_org    !Using the original interval in the restoring file
+          BIMD_record_method=1
+        else
+          BIMD_rec_interval=final_loop-init_loop+100.D0   !BIMD_rec_interval > total loop ==>Do not backup!  because the restoring point covers init_loop
+          BIMD_record_method=0
+        endif
+      else 
+C===================if BIMD restoring file not exist=====================
+        if(init_loop.eq.1.D0.and.record_method_bac.eq.1)then
+C===================Make velocity stable=======================================
+          if(wscreen)write(*,"(I5,1x,A24)")
+     &myid,"Start Velocity Stablizer"
+          init_loop=1.D0
+          final_loop=final_loop_vel
+          a1 = BIMD_delta_time_vel*8.0D0/3.0D0
+          a5 = BIMD_delta_time_vel*3.0D0/8.0D0
+          BIMD_record_method=0
+          call BIMD
+          a1 = BIMD_delta_time*8.0D0/3.0D0
+          a5 = BIMD_delta_time*3.0D0/8.0D0
+          init_loop=init_loop_bac
+          final_loop=final_loop_bac
+          BIMD_rec_interval=rec_interval_bac
+          BIMD_record_method=record_method_bac
+          call BIMD_init_thermal
+          if(wscreen)write(*,"(I5,1x,A25)")
+     &myid,"End of Velocity Stablizer"
+C===================End of velocity stablizer====================================
+          if(wscreen)write(*,"(I5,1x,A16)")
+     &myid,"Start a new BIMD"
+          return
+        else
+          init_loop=1.D0
+          final_loop=init_loop_bac-1.D0
+          if(BIMD_rec_interval.le.min_rec_interval)then
+            BIMD_rec_interval=1.D6
+          else
+            BIMD_rec_interval=rec_interval_bac
+          endif
+          BIMD_record_method=1
+        endif
+      endif
+C==============Start precede BIMD==================================== 
+      if(final_loop.ge.init_loop)then
+        if(wscreen)then
+          write(*,"(I5,1x,A23,1x,F13.1,1x,A2,1x,F13.1)") 
+     &myid,"Precede BIMD from loop ",init_loop,"to",
+     &final_loop
+        endif
+        call BIMD
+        if(wscreen)write(*,"(I5,1x,A22)")
+     &myid,"Precede BIMD completed"
+      endif
+C===============End of precede BIMD================================
+      if(BIMD_reset_thermal.eq.2)then
+        if(wscreen)write(*,"(I5,1x,A24)")myid,"reset thermal quantities"
+        call BIMD_init_thermal
+        start_loop=init_loop_bac
+      else
+        start_loop=1.D0
+      endif
+      init_loop=init_loop_bac
+      final_loop=final_loop_bac
+      BIMD_rec_interval=rec_interval_bac 
+      BIMD_record_method=record_method_bac
+      return
+      end
+* ======================GNU General Public License=======================
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*  
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+* 
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+* =======================================================================

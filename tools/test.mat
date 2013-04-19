@@ -1,0 +1,44 @@
+# pes_id label
+# jump 5 
+# jump_info: 5 30 
+# data_type: real
+# annotation:
+# name: a 
+# type: matrix
+# rows: 1
+# columns: 4
+ 1 2 3 4
+# integer
+# rerekf
+# name: b
+# type: matrix
+# rows: 1
+# columns: 4
+ 5.5 6.6 7.7 8.800000000000001
+# name: c
+# type: string
+# elements: 1
+# length: 5
+opera
+# name: d
+# type: matrix
+# rows: 2
+# columns: 4
+ 1 2 3 4
+ 5 6 7 8
+# name: e
+# type: scalar
+1
+# name: f
+# type: scalar
+2000
+# name: g
+# type: scalar
+-0.00563234
+# name: h
+# type: string
+# elements: 2
+# length: 5
+oper  
+# length: 4
+atcgok

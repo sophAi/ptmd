@@ -1,0 +1,3 @@
+job 400 BIMD   Brownian-type_Molecular_Dynamic
+job 700 TESTER Check_and_Analysis_Present_Data
+job 999 SKIP   Skip_the_current_job

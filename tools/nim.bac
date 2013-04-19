@@ -1,0 +1,90 @@
+       subroutine nim_init
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/nim.h"
+       nim_eff_num=0
+       do I0=1,nim_dim_max
+         nim_eff_var_num(I0)=0
+         do I1=1,nim_dim_max 
+           nim_matrix(I0,I1)=0
+           nim_eff_var(I0,I1)=0
+           nim_flag(I0,I1)=0
+           nim_pool_flag(I0,I1)=0
+         enddo
+       enddo
+       return
+       end
+ 
+       subroutine nim_eff
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/nim.h"
+       integer nim_temp,nim_id_temp
+       nim_temp=0
+       nim_pool_total_num=0
+       nim_cat_total_num=0
+       do I0=1,nim_dim   !for y
+         do I1=1,I0-1    !for x
+           if(nim_matrix(I0,I1).ge.nim_threshold)then
+             nim_flag(I0,I1)=1
+             nim_flag(I1,I0)=1
+             nim_pool_total_num=nim_pool_total_num+1
+             if(nim_temp.ne.I0)then
+               nim_cat_total_num=nim_cat_total_num+1
+               nim_id_temp=0
+               nim_temp=I0
+             endif
+             nim_id_temp=nim_id_temp+1
+             nim_cat_num(nim_cat_total_num)=nim_id_temp     !number of eff var. pre cat
+             nim_pool_x(nim_cat_total_num,nim_id_temp)=I0
+             nim_pool_y(nim_cat_total_nun,nim_id_temp)=I1
+             nim_pool_flag(nim_cat_total_num,nim_id_temp)=0
+             nim_pool_map_cat(I0,I1)=nim_cat_total_num
+             nim_pool_map_cat(I1,I0)=nim_cat_total_num
+             nim_pool_map_var(I0,I1)=nim_id_temp
+             nim_pool_map_var(I0,I1)=nim_id_temp    
+           endif
+         enddo
+       enddo
+       call nim
+       return
+       end
+
+       subroutine nim
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/nim.h"
+       do I0=1,nim_cat_total_num
+         do I1=1,nim_cat_num(I0)
+           if(nim_pool_flag(I0,I1).eq.0)then
+             nim_eff_num=nim_eff_num+1
+             nim_eff_var_num(nim_eff_num)=nim_eff_var_num(nim_eff_num)+1
+             nim_eff_var(nim_eff_num,1)=I0
+             do I2=1,nim_cat_num(I0)
+               if(nim_flag(nim_pool_y(I0,I1),nim_pool_y(I0,I2)).eq.1)then
+                 nim_pool_flag
+     &(nim_pool_map_cat(I1,I2),nim_pool_map_var(I1,I2))=1
+                 nim_eff_var_num(nim_eff_num)=
+     &nim_eff_var_num(nim_eff_num)+1
+                 nim_eff_var(nim_eff_num,nim_eff_var_num(nim_eff_num))=
+     &I2
+               endif
+             enddo
+           endif
+         enddo
+       enddo
+       return
+       end
+
+       subroutine nim_hash
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/nim.h"
+ 
+
+       return
+       end

@@ -1,0 +1,14 @@
+History of sophAi
+
+Version       Features
+0.5.5         Other potential form
+0.5.0         Optimization with BH, GA, and Clustering
+0.4.7         Bayes probability with NIM algorithm
+0.4.5         Clustering sorting for correlation matrix
+0.4.0         Correlation matrix with NIM algorithm
+0.3.7         Generalized architecture for analysis system   
+0.3.6         GVACF and general score function of moment descriptors
+0.3.5         USR and score function of moment descriptors 
+0.3.0         PTMC
+0.2.0         BIMD and VACF
+0.1.0         Initial sophAi

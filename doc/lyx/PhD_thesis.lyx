@@ -1,0 +1,100 @@
+#LyX 1.6.5 created this file. For more info see http://www.lyx.org/
+\lyxformat 345
+\begin_document
+\begin_header
+\textclass aastex
+\use_default_options true
+\language chinese-traditional
+\inputencoding UTF8
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+\font_cjk cwfsc
+
+\graphics default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_amsmath 1
+\use_esint 1
+\cite_engine natbib_authoryear
+\use_bibtopic false
+\paperorientation portrait
+\leftmargin 2cm
+\topmargin 2cm
+\rightmargin 2cm
+\bottommargin 2cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\author "" 
+\author "" 
+\end_header
+
+\begin_body
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Section
+Methodology
+\end_layout
+
+\begin_layout Subsection
+Global Optimization for Ground State
+\end_layout
+
+\begin_layout Subsection
+Molecular Dynamics Simulation
+\end_layout
+
+\begin_layout Subsection
+sophAi: An Cyclical and Parallel Algorithm for Simulation and Self-analysis
+\end_layout
+
+\begin_layout Section
+Results
+\end_layout
+
+\begin_layout Section
+Conclusions
+\end_layout
+
+\begin_layout Appendix
+Appendix 1
+\end_layout
+
+\begin_layout Standard
+An example of the standard file structure of sophAi is shown as follows:
+\end_layout
+
+\begin_layout Standard
+output/BIMD/his/BIMD_pot_gupta_pure_Ag0014_0010_nor.his
+\end_layout
+
+\begin_layout Standard
+From left to right, the path structure represent the root path, the simulation
+ path and the source path.
+ For file name structure, they represent the simulation method, the source,
+ the potential form, the compisition of the cluster, the corresponding compositi
+on, the parallel parameter (the temperature in this case), the brief description
+ of this file, and the type of this file.
+\end_layout
+
+\end_body
+\end_document

@@ -1,0 +1,120 @@
+      subroutine tester_init
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/file.h"
+      include "../../include/life.h"
+      include "../../include/job.h"
+      include "../../include/ensemble.h"
+      include "../../include/pes.h"
+      include "../../include/BIMD/BIMD.h"
+      include "../../include/VACF/VACF.h"
+      include "../../include/tester/tester.h"
+      include "../../include/tester/sliding.h"
+      include "../../include/tester/usr_score.h"
+      integer total_num1,total_num2
+      character read_atom_name*4,dim_dummy1*10,dummy2*10,dummy3*17
+      character dummy4*12,tester_id_flag*10
+      file_name=file_path(:index(file_path," ")-1)//job_file
+      total_num1=6
+C=================locate parameters======================
+      call wait_till_file_close(file_name)
+      open(20,file=file_name,status="old")
+      do I0=1,job_line_num-1
+        read(20,*)
+      enddo
+      read(20,*) atom_num,dim_dummy1,
+     &(read_flag(I0),read_int(I0),I0=1,total_num1)
+ 
+      read(20,*) tester_id_flag,tester_id
+      if(tester_id.eq.1)then
+        if(wscreen)
+     &write(*,"(I5,1x,A27)")myid,"Calculating sliding windows"
+        total_num2=7
+      endif
+      if(tester_id.eq.3)then
+        if(wscreen)
+     &write(*,"(I5,1x,A22)")myid,"Calculating usr scores"
+        total_num2=14
+      endif
+      backspace(20)
+      read(20,*)
+     &(read_flag(total_num1+I0),read_real8(total_num1+I0),
+     &I0=1,total_num2),
+     &tester_data_type,tester_flag,tester_input_file_name
+      do I0=1,total_num1+total_num2
+        if(read_flag(I0).eq."job_ensemble=")ensemble_num=read_int(I0)
+        if(read_flag(I0).eq."loop=")loop_num=read_int(I0)
+        if(read_flag(I0).eq."pes_id=")pes_id=read_int(I0)
+        if(read_flag(I0).eq."init_temp=")init_temp=read_real8(I0)
+        if(read_flag(I0).eq."final_temp=")final_temp=read_real8(I0)
+        if(read_flag(I0).eq."dTemp=")delta_temp=read_real8(I0)
+        if(read_flag(I0).eq."window=")
+     &window_width=dint(read_real8(I0))
+        if(read_flag(I0).eq."sliding=")
+     &sliding_width=dint(read_real8(I0))
+        if(read_flag(I0).eq."read_file_method=")
+     &tester_read_file_flag=dint(read_real8(I0))
+        if(read_flag(I0).eq."init_loop=")
+     &usr_score_init_loop=read_real8(I0)
+        if(read_flag(I0).eq."final_loop=")
+     &usr_score_final_loop=read_real8(I0)
+        if(read_flag(I0).eq."dloop=")
+     &usr_score_delta_loop=read_real8(I0)
+        if(read_flag(I0).eq."1st=")
+     &usr_score_1st_moment=dint(read_real8(I0))
+        if(read_flag(I0).eq."2nd=")
+     &usr_score_2nd_moment=dint(read_real8(I0))
+        if(read_flag(I0).eq."3rd=")
+     &usr_score_3rd_moment=dint(read_real8(I0))
+        if(read_flag(I0).eq."4th=")
+     &usr_score_4th_moment=dint(read_real8(I0))
+        if(read_flag(I0).eq."target_init=")
+     &usr_score_target_init=read_real8(I0)
+        if(read_flag(I0).eq."target_final=")
+     &usr_score_target_final=read_real8(I0)
+      enddo
+      do I1=1,atom_num
+        I2=I1*3
+        read(20,*) read_atom_name,x(I2-2),x(I2-1),x(I2)
+        atom_name(I1)=read_atom_name
+        if(I1.eq.1)then
+          atom_name_a=read_atom_name
+          atom_name_b=read_atom_name
+          atom_num_a=1
+          atom_num_b=0
+        else if(I1.ge.2.and.read_atom_name.eq.atom_name_a)then
+          atom_num_a=atom_num_a+1
+        else if(I1.ge.2.and.read_atom_name.ne.atom_name_a)then
+          atom_name_b=read_atom_name
+          atom_num_b=atom_num_b+1
+        endif
+      enddo
+      ndim_fac=3
+      ndim=atom_num*ndim_fac
+      ndim_a=atom_num_a*ndim_fac
+      ndim_b=atom_num_b*ndim_fac
+      if(atom_num.ne.(atom_num_a+atom_num_b))then
+        write(*,*)
+     &"Error, atom A=",atom_num_a,",and atom B=",atom_num_b
+        write(*,*) "Not equal to total atom number=",atom_num
+        close(20)
+        stop
+      endif
+      if(wscreen)then
+        write(*,"(I5,1x,A18,1x,I4,A4,A1,1x,I4,1x,A4,A1,1x,I4)")
+     &myid,"Total atom number=",atom_num
+     &,atom_name_a(:index(atom_name_a," ")-1),"=",
+     &atom_num_a
+     &,atom_name_b(:index(atom_name_b," ")-1),"=",
+     &atom_num_b
+        write(*,"(I5,1x,A14,1x,A20)")
+     &myid,"Tester job is ",tester_flag
+        write(*,"(I5,1x,A19,1x,A80)")
+     &myid,"Input file name is ",tester_input_file_name 
+        write(*,"(I5,1x,A7,1x,I9,1x,A8,1x,I9)")
+     &myid,"window=",window_width,"overlap=",sliding_width
+      endif
+      close(20)
+      return
+      end

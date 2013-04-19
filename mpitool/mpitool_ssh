@@ -1,0 +1,391 @@
+#!/bin/bash
+########################################################################
+#             MPITOOL Copyleft (C) 2007,2008,2009 Po-Jen Hsu          #
+########################################################################
+#    MPITOOL is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+#Directory setting
+# copy this file to /usr/bin
+mpd_dir=/home   # the location of mpd.hosts and mpd.cpu
+mpd_secret_word=--su  # Password for Advance options. To enter advance mode, type mpitool --su
+mpd_ssh_no_password=--ssh #Password for ssh mode. To enter this mode, type mpitool --ssh
+mpd_mpitool_help=--help
+mpd_mpitool_SophAi=--SophAi
+mpd_config=config.out  #Default config file name"
+mpd_host_wc_from_line=1  #For some machine, it fails to read the wc -l command
+mpd_host_wc_to_line=2    #make sure to adjust these two values. You could try wc -l /home/mpd.hosts first
+account=`whoami`
+remote_sh_method=ssh
+echo -e " "
+echo -e " "
+echo -e "                  Greeting!!" $account
+if [ "$1" == "$mpd_mpitool_help" ]; then
+  echo -e " "
+  echo -e "For ssh command without password, you could try mpitool --ssh"
+  echo -e "For root user who is trying to setup the mpd server, please try mpitool --su"
+  echo -e "More functions will comming."
+  time=`date`
+  echo -e " " 
+  echo -e "Now it is "$time
+  echo -e "Have a nice day"
+  echo -e " "
+  exit 0
+fi
+if [ "$1" == "$mpd_ssh_no_password" ]; then
+  echo -e " "
+  echo -n "#Current directory is " && pwd
+  echo -e "#---------------------------------------------------"
+  echo -e "#The available host machine are:"
+  cat $mpd_dir/mpd.hosts
+  echo -e " "
+  echo -e "#---------------------------------------------------"
+  until [ "$ssh_sel" == 0 ]
+  do
+    echo -e "=============No password for ssh============="
+    echo -e "0.Quit"
+    echo -e "1.Generating a new ssh key."
+    echo -e "2.Copy ssh key to the specified destination."
+    echo -e "3.Test ssh."
+    read -p ": " ssh_sel
+#######################QUIT########################################
+    if [ "$ssh_sel" == 0 ]; then
+      time=`date`
+      echo -e " "
+      echo -e "Now it is "$time
+      echo -e "Have a nice day"
+      echo -e " "
+      exit 0
+    fi
+######################Generating new key############################
+    if [ "$ssh_sel" == 1 ]; then
+      echo -e "Before generating a new ssh key, the old key must be deleted"
+      echo -e "Would you like to delete your old ssh key?<y/n>"
+      read -p ": " yn
+      if [ "$yn" == "y" ]; then
+        rm -rf /home/$account/.ssh
+      fi
+      echo -e "Please press enter until it finish"
+      ssh-keygen -t rsa
+    fi
+#######################Copy ssh key to another machine###############
+    if [ "$ssh_sel" == 2 ]; then
+      echo -e "Please indicate the hostname or ip that you want to make no ssh password."
+      read -p ": " ssh_host
+      cat ~/.ssh/id_rsa.pub | ssh $account@$ssh_host "umask 077; test -d .ssh || mkdir .ssh ; cat >> .ssh/authorized_keys"
+    fi
+######################Test ssh no password###########################
+    if [ "$ssh_sel" == 3 ]; then
+      echo -e "Please indicate what machine you want to test"
+      read -p ": " ssh_host
+      ssh  $account@$ssh_host
+    fi
+  done
+fi
+echo -e " "
+echo -e "======================================================="
+echo -e "                   MPICH Tool V1.5"
+echo -e "        Copyleft (C) 2007,2008,2009 Po-Jen Hsu"
+echo -e "                Last updated 2009/08/20"
+if [ "$1" == "$mpd_mpitool_SophAi" ]; then
+  echo -e " Based on the original concept of SophAi by Po-Jen Hsu"
+fi
+echo -e " "
+echo -e "This program is published under the GNU General Public License"
+echo -e "which comes with ABSOLUTELY NO WARRANTY; for details please see"
+echo -e " "
+echo -e "             <http://www.gnu.org/licenses/>."
+echo -e " "
+echo -e "======================================================="
+echo -e " "
+read -p "Press <Enter> to continue"
+test -e $mpd_dir/mpd.hosts && file_exist=1 || file_exist=0   #=1 exist; =0 not exist
+if [ "$file_exist" == 0 ]; then
+  echo -e $mpd_dir"/mpd.hosts does not exist"
+  echo -e "Please put your mpd.hosts to "$mpd_dir"/ directory"
+  echo -e ", not your home directory"
+  echo -e "This file should contain all available host machine"
+  echo -e "ex:"
+  echo -e "cp64a:2 ifhn=192.168.1.1"
+  echo -e "cp64b:2 ifhn=192.168.1.2"
+  echo -e "..etc."
+  read -p "Press <Enter> to edit mpd.hosts by vi"
+  vi $mpd_dir/mpd.hosts
+else
+  declare -i num_hosts=`wc -l $mpd_dir/mpd.hosts | cut -c$mpd_host_wc_from_line-$mpd_host_wc_to_line`
+  echo -e " "
+  echo -e "#---------------------------------------------------"
+  echo -e "#Number of available host machine= "$num_hosts
+# store number of hosts in $num_hosts
+fi
+test -e $mpd_dir/mpd.host_num && file_exist=1 || file_exist=0   #=1 exist ; =0 not exist
+if [ "$file_exist" == 0 ]; then
+  echo -e $mpd_dir"/mpd.host_num does not exist"
+  echo -e "You could specify the number of host in this file."
+  echo -e "If there is no such a file, the MPITOOL will count the number itself."
+else
+  declare -i total_hosts=`cut -c1-2 $mpd_dir/mpd.host_num`
+  echo -e "#You had specify the availiable number of host= "$total_hosts
+  echo -e "#If this is not what you want, please delete /home/mpd.host_num" 
+  echo -e "#---------------------------------------------------"
+fi
+
+test -e mpd_job && file_exist=1 || file_exist=0   #=1 exist ; =0 not exist
+if [ "$file_exist" == 0 ]; then
+  echo -e " "
+  echo -e "Warning!! mpd_job does not exist"
+  echo -e "Please edit mpd_job first"
+  echo -e "ex:"
+  echo -e "cp64a:2 ifhn=192.168.1.1"
+  echo -e "cp64c:1 ifhn=192.168.1.3"
+  echo -e "cp64f:2 ifhn=192.168.1.6"
+  echo -e "..etc."
+  echo -e "For this case,the job you submitted will be executed on cp64a with 2 nodes"
+  echo -e "1 node on cp64c and 2 nodes on cp64f"
+  echo -e " "
+  echo -e "Do you want to make a default mpd_job file?<y/n>"
+  read -p ": " yn
+  if [ "$yn" == "y" ]; then
+    cat $mpd_dir/mpd.hosts > mpd_job
+    echo -e "Although the default mpd_job file is generated,"
+    echo -e "it should be modified to fit your purpose"
+    read -p "Press <Enter> to edit mpd_job by vi"
+    vi mpd_job
+    echo -e "Your mpd_job is successfully modified:"
+    echo -e " "
+  fi
+fi
+
+echo -e " "
+echo -n "#Current directory is " && pwd
+echo -e "#---------------------------------------------------"
+echo -e "#The available host machine are:"
+cat $mpd_dir/mpd.hosts
+echo -e " "
+echo -e "#---------------------------------------------------"
+until [ "$sel" == 0 ]
+do
+###############Loop Menu#################################################
+  echo -e " "
+  read -p "Press <Enter> to continue"
+  echo -e "#This shows how your job be submitted to each node"
+  cat mpd_job
+  echo -e "#---------------------------------------------------"
+  echo -e "<<MPICH2 TOOL MENU>>:"
+  echo -e "0.Quit"
+  echo -e "1.Run config.out. (your account)"
+  echo -e "2.Start a mpd job. (your account)"
+  echo -e "3.Clear all mpd jobs and restart a mpd environment. (your account)"
+  echo -e "4.Edit mpd_job file. (your account)"
+  echo -e "5.List all mpd jobs. (your account)"
+  if [ "$1" == "$mpd_secret_word" ]; then
+    echo -e "6.Test MPICH2 Performance. (your account)"
+    echo -e "7.Reset MPICH2 shell environment. (your account)"
+    echo -e "8.Solve MPICH2 conflict. (your account)"
+    echo -e "9.Edit "$mpd_dir"/mpd.hosts file. (root)"
+  fi
+  read -p ": " sel
+
+  if [ "$sel" == 1 ]; then
+    test -e $mpd_config && file_exist=1 || file_exist=0   #=1 exist ; =0 not exist
+    if [ "$file_exist" == 1 ]; then
+      ./$mpd_config
+    else
+      echo -e "config.out does not exist, please indicate your config file name"
+      read -p ": " filename
+      ./$filename
+    fi
+  fi
+#######################Start mpd job#####################################
+  if [ "$sel" == 2 ]; then
+    echo -e "Please make sure the mpd_job file in you executable directory is correct"
+    cat mpd_job
+#    declare -i total_nodes=$num_hosts*$cpu_per_host
+    echo -e " "
+#    echo -e "The max number of nodes= "$total_nodes
+    echo -e "Please input the number of processes."
+    echo -e "This value should not be greater than the total number of nodes in mpd_job"
+    read -p ": " nodes
+    echo -e "Please input the full name of the executable file,ex:a.out"
+    read -p ": " filename
+    test -e $filename && file_exist=1 || file_exist=0    #1=exist 0=not exist
+    if [ "$file_exist" == 1 ]; then
+      echo -e "Please input a short alias of this job<ex:Ag13Cu25>"
+      echo -e "Or enter none for no alias<Please don't skip this procedure>"
+      read -p ": " jobalias
+      if [ "$jobalias" == "none" ]; then
+        echo -e "No job alias"
+      else
+        echo -e "Job alias=" $jobalias
+      fi
+      echo -e "1.Submit job in foreground"
+      echo -e "2.Submit job in background"
+      read -p ": " background
+      echo -e "Are you sure?<y/n>"
+      read -p ": " yn
+      if [ "$yn" == "y" ]; then
+        if [ "$background" == 1 ]; then
+          if [ "$jobalias" == "none" ]; then
+            mpiexec -machinefile mpd_job -n $nodes -path . $filename
+          else
+            mpiexec -a $jobalias -machinefile mpd_job -n $nodes -path . $filename
+          fi
+          exit 0
+        fi
+        if [ "$background" == 2 ]; then
+          if [ "$jobalias" == "none" ]; then
+            mpiexec -machinefile mpd_job -n $nodes -path . $filename > /dev/null &
+          else
+            test -e $jobalias.log && file_exist=1 || file_exist=0 
+            if [ "$file_exist" == 1 ]; then
+              echo -e "Replace and backup log file"
+              cp -f $jobalias.log $jobalias.last
+              rm -f $jobalias.log
+            else
+              echo -e "Establish log file"
+            fi
+            mpiexec -a $jobalias -machinefile mpd_job -n $nodes -path . $filename > $jobalias.log &
+          fi
+          exit 0
+        fi
+      else
+        echo -e "Abort and return to menu.."
+      fi
+    fi
+    if [ "$file_exist" == 0 ]; then
+      echo -e "Error! file does not exist, please try again"
+    fi
+  fi
+####################Start MPD ring###########################################
+  if [ "$sel" == 3 ]; then
+    echo -e " "   
+    echo -e "<< Prepare to initialize MPD environment>>"
+    echo -e "**If there is no mpd daemon running, it will show some error"
+    echo -e "message. This is normal"
+    echo -e " "
+    echo -e "This will stop all running jobs"
+    echo -e "Are you sure?<y/n>"
+    read -p ": " yn
+    if [ "$yn" == "y" ]; then
+      test -e /home/$account/.mpd.conf && file_exist=1 || file_exist=0
+      if [ "$file_exist" == 1 ]; then
+        rm -f /home/$account/.mpd.conf
+      fi
+      echo -e "Writing default password in" /home/$account/.mpd.conf
+      echo "MPD_SECRETWORD=%"$account"_SophAi_is_not_just_for_the_research_in_Physics%" >/home/$account/.mpd.conf
+      chmod 600 /home/$account/.mpd.conf
+      echo -e "Writing complete!"
+      export PATH=$mpd_dir/mpich2/bin:$PATH
+      export LD_LIBRARY_PATH=$mpd_dir/mpich2/lib:$LD_LIBRARY_PATH
+      echo -e "Reset mpd environment"
+      echo -e " "
+#    read -p "Please input number of hosts: " hosts
+#    read -p "Please input number of processor per host: " cpu
+      mpdallexit
+#    mpdboot --file=/home/mpd.hosts --ncpus=$cpu
+#      mpdboot --file=$mpd_dir/mpd.hosts -n $num_hosts --ncpus=$cpu_per_host
+      test -e $mpd_dir/mpd.host_num && file_exist=1 || file_exist=0   #=1 exist ; =0 not exist
+      echo -e "You are using "$remote_sh_method
+      if [ "$file_exist" == 0 ]; then
+        mpdboot --file=$mpd_dir/mpd.hosts -n $num_hosts --rsh=$remote_sh_method   #use the counted number from mpd.host,rsh
+      else
+        mpdboot --file=$mpd_dir/mpd.hosts -n $total_hosts  --rsh=$remote_sh_method #use the specified number from mpd.host_num ,rsh
+      fi
+      mpdboot --file=$mpd_dir/mpd.hosts -n $num_hosts --rsh=$remote_sh_method #--rsh=rsh,rlogin,or ssh
+      echo -e "Available hosts:"
+      mpdtrace
+      echo -e " "
+      echo -e "Hostname_PID# IP"
+      mpdtrace -l
+      echo -e " "
+      echo -e "If you see all nodes are successful appeared, you could start mpd jobs now"
+    else
+      echo -e " Nothing changed"
+    fi
+  fi
+###############################Edit mpd_job ilfe################################
+  if [ "$sel" == 4 ]; then
+    echo -e "You may setup the configuration of MPI machines by adding something like"
+    echo -e "cp64a:2 ifhn=192.168.1.1"
+    echo -e "cp64c:1 ifhn=192.168.1.3"
+    echo -e "cp64f:2 ifhn=192.168.1.6"
+    echo -e "..etc."
+    echo -e "For this case,the job you submitted will be executed on cp64a with 2 nodes"
+    echo -e "1 node on cp64c and 2 nodes on cp64f"
+    echo -e " "
+    echo -e "Would you like to generate a default mpd_job?<y/n>"
+    read -p ": " yn
+    if [ "$yn" == "y" ]; then
+      cat $mpd_dir/mpd.hosts > mpd_job
+    fi
+    echo -e "Now please modify mpd_job to fit your purpose"
+    read -p "Press <Enter> to edit mpd_job by vi"
+    vi mpd_job
+  fi
+###############################List MPD jobs###################################
+  if [ "$sel" == 5 ]; then
+    mpdlistjobs
+    echo -e "And the status of current users:"
+    w
+  fi
+##############################Exit#############################################
+  if [ "$sel" == 0 ]; then
+    time=`date`
+    echo -e " "
+    echo -e "Now it is "$time
+    echo -e "Have a nice day"
+    echo -e " "
+    exit 0
+  fi
+############################Edit mpd.hosts file in /home/mpd.hosts#############
+  if [ "$sel" == 9 ]; then
+    echo -e "Edit "$mpd_dir"/mpd.hosts"
+    read -p "Press <Enter> to continue"
+    vi $mpd_dir/mpd.hosts
+    declare -i num_hosts=`wc -l $mpd_dir/mpd.hosts | cut -c$mpd_host_wc_from_line-$mpd_host_wc_to_line`
+  fi
+###############################Test MPD loop performance#######################
+  if [ "$sel" == 6 ]; then
+    echo -e "Please input the number of test loop:<ex:100>"
+    read -p ": " num_loop
+    echo -e " "
+    mpdringtest $num_loop
+    echo -e " "
+  fi
+  if [ "$sel" == 7 ]; then
+    echo -e "Please input your MPICH2 location"
+    echo -e "You could try /home or /home/your_account"
+    echo -e "Note: do not use /home/ or /home/your_account/"
+    echo -e "The additional character '/' will cause error"
+    read -p ": " mpich2_dir
+    echo -e "Configurating bash environment for MPICH2"
+    export F90FLAGS="-i4"
+    #export PGI=/home/pgi        #alternative pgi default path in /home
+    export PATH=$mpich2_dir/mpich2/bin:$PATH
+    export LD_LIBRARY_PATH=$mpich2_dir/mpich2/lib:$LD_LIBRARY_PATH
+    #export PATH=/home/mpich2/bin:$PATH                 #alternative MPICH2 path in /home
+    #export LD_LIBRARY_PATH=/home/mpich2/lib:$LD_LIBRARY_PATH    #alternative MPICH2 path in /home
+    #Please use either notation one or non-notation one
+    echo -e "Configurating complete!"
+  fi
+  if [ "$sel" == 8 ]; then
+    echo -e "Be sure that kill_mpds.py and check_mpds.py are in /home/ directory"
+    echo -e "Start clear all mpd settings.."
+    python /home/check_mpds.py
+    python /home/kill_mpds.py
+    echo -e "Complete"
+  fi
+done
+
+##################End of MPICH Tool#########################################

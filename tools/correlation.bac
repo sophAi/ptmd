@@ -1,0 +1,183 @@
+      subroutine correlation_p_matrix(file_name)
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/cn/cn.h"
+      include "../include/tester/sliding.h"
+      character*3 correlation_flag
+      correlation_flag=file_name(index(file_name,".")+1:)
+      if(wscreen)
+     &write(*,"I5,1x,A17,1x,A3") 
+     &myid,"correlation type=",correlation_flag
+      if(correlation_flag.eq."cn")then
+        call p_matrix_cn(file_name)  
+      endif
+      if(correlation_flag.eq."anl")then
+        call p_matrix_anl(file_name)
+      endif
+      return
+      end
+
+      subroutine correlation(file_name)
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/cn/cn.h"
+      include "../include/tester/sliding.h"
+      integer start_loop,end_loop
+      start_loop=1
+      end_loop=999
+      overlap_loop=1000
+      window_loop=2000
+      do I0=start_loop,end_loop
+        J1=(I0-1)*overlap_loop+1
+        J2=(I0-1)*overlap_loop+window_loop
+        call correlation_matrix(file_name,J1,J2)
+      enddo
+      file_name=file_name(:index(file_name,".")-1)//".slc"
+      return
+      end
+
+      subroutine correlation_matrix(file_name,cor_window_init,
+     &cor_window_final)
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/cn/cn.h"
+      include "../include/tester/sliding.h"
+      integer cor_window_time,previous_total_pair_digits
+      parameter(cor_window_time=2000)
+      integer p_exist(cn_max),p(CN_max),s(CN_max),dp
+      integer cor(cn_max,CN_max),p_exist_time(cor_window_time,CN_max)
+      integer cor_window_init,cor_window_final,time_step
+      integer total_p_num,p_id_out(cn_max),digit_out(CN_max),
+     &p_time(cor_window_time,cn_max)
+      integer cor_hist(cor_window_time),largest_gap_min,largest_gap_max
+      integer threshold,largest_gap,gap,upper_hist_index
+      real*8 real_dummy1
+      do I0=1,cn_max
+        p_exist(I0)=0
+        do J0=1,cn_max
+          cor(I0,J0)=0
+        enddo
+        do J0=cor_window_init,cor_window_final
+          p_exist_time(J0,I0)=0
+          p_time(J0,I0)=0
+        enddo
+      enddo
+      open(21,file=file_name,status="old")
+      do I0=1,cor_window_init
+        read(21,*)time_step,real_dummy1,cn_name
+      enddo
+      write(*,*) "start from ",time_step
+      call cn2digits
+      do I0=1,total_pair_digits
+        p_exist(cn_matrix(I0))=1
+        p_time(1,cn_matrix(I0))=CN_aboundance(I0)
+        p_exist_time(1,cn_matrix(I0))=1
+      enddo
+      do I0=cor_window_init+1,cor_window_final
+        read(21,*)time_step,real_dummy1,cn_name
+        call cn2digits
+        do I1=1,total_pair_digits
+          p_exist(cn_matrix(I1))=1
+          p_exist_time(I0,cn_matrix(I1))=1
+          p_time(I0,cn_matrix(I1))=CN_aboundance(I1)
+        enddo
+        do I1=1,cn_max
+          s(I1)=0
+          if(p_exist_time(I0-1,I1).ne.0.or.p_exist_time(I0,I1).ne.0)then
+            dp=p_time(I0,I1)-p_time(I0-1,I1)
+            if(dp.gt.0)then
+              s(I1)=1
+            else if(dp.lt.0)then
+              s(I1)=-1
+            else
+              s(I1)=0
+            endif
+C            if(s(I1).ne.0)then
+C              call digitexmatrix(pair_digits,dig1,dig2,dig3,dig4,I1,1)
+C              write(*,*) "I0=",I0,",I1=",I1,",dp=",dp,",d=",s(I1),
+C     &pair_digits
+C              pause
+C            endif
+          endif
+        enddo
+        do I1=1,cn_max
+          do J1=I1+1,cn_max
+            cor(I1,J1)=cor(I1,J1)+
+     &abs((s(I1)+s(J1))*s(J1))/2
+            cor(J1,I1)=cor(I1,J1)
+C            if(cor(I1,J1).ne.0)write(*,*) I1,J1,cor(I1,J1)
+          enddo
+        enddo
+      enddo
+      close(21)
+C================output==========================
+      open(22,file="correlation_matrix.dat",access="append")
+      total_p_num=0
+      do I1=1,cn_max
+        if(p_exist(I1).ne.0)then
+          total_p_num=total_p_num+1
+          p_id_out(total_p_num)=I1
+          call digitexmatrix(pair_digits,dig1,dig2,dig3,dig4,I1,1)
+          digit_out(total_p_num)=pair_digits
+        endif
+      enddo
+      write(22,*)cor_window_init,cor_window_final
+      write(22,"1000(I4,1x)") 
+     &total_p_num,(digit_out(I0),I0=1,total_p_num)
+      upper_hist_index=0
+      do I1=1,total_p_num
+        write(22,"1000(I4,1x)")digit_out(I1),
+     &(cor(p_id_out(I1),p_id_out(J1)),J1=1,total_p_num)
+        do J1=I1+1,total_p_num
+          cor_hist(cor(p_id_out(I1),p_id_out(J1)))=
+     &cor_hist(cor(p_id_out(I1),p_id_out(J1)))+1
+          if(cor(p_id_out(I1),p_id_out(J1)).gt.upper_hist_index)then
+            upper_hist_index=cor(p_id_out(I1),p_id_out(J1))
+          endif
+        enddo
+      enddo
+      write(*,*) "upper_hist_index=",upper_hist_index
+      open(23,file="correlation_histogram.dat",access="append")
+      write(23,*) "# ",cor_window_init,cor_window_final
+      largest_gap_min=1
+      largest_gap=0
+      do I0=1,upper_hist_index-1
+        if(cor_hist(I0).ne.0)then
+          write(23,"10(I4,1x)") I0,cor_hist(I0)
+          gap=0
+          do J0=I0+1,upper_hist_index
+            if(cor_hist(J0).eq.0)then
+              gap=gap+1
+            else
+              I1=I0
+              J1=J0
+              goto 11
+            endif
+          enddo
+11        if(gap.gt.largest_gap)then
+            largest_gap=gap
+            largest_gap_min=I1
+            largest_gap_max=J1
+          endif
+        endif
+      enddo
+      write(23,"10(I4,1x)") upper_hist_index,cor_hist(upper_hist_index)
+      threshold=(largest_gap_max+largest_gap_min)/2
+      write(22,*)"largest_gap_min= ",largest_gap_min,
+     &",largest_gap_max= ",largest_gap_max,",threshold=",threshold
+      close(23)
+      close(22)
+C==============Clustering=================================
+
+C=========================================================
+      return
+      end

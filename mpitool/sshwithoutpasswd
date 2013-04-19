@@ -1,0 +1,16 @@
+Generate a keygen by typing "ssh-keygen -t rsa"
+
+% ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/david/.ssh/id_rsa):
+Created directory '/home/david/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/david/.ssh/id_rsa.
+Your public key has been saved in /home/david/.ssh/id_rsa.pub.
+The key fingerprint is:
+7f:a3:7c:37:54:08:2c:a8:37:0a:64:74:d9:7a:1f:0a david@mydomain.org
+
+Then copy the keygen to the client PC
+
+cat ~/.ssh/id_rsa.pub | ssh jrandom@example.net "umask 077; test -d .ssh || mkdir .ssh ; cat >> .ssh/authorized_keys"

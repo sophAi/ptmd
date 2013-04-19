@@ -1,0 +1,144 @@
+      subroutine edit_PTMC
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/pes.h"
+      include "../../include/file.h"
+      include "../../include/job.h"
+      include "../../include/ensemble.h"
+      include "../../include/PTMC/PTMC.h"
+      character yn*1
+      write(*,*) "<<<<PTMC MENU>>>>"
+      write(*,*) "please input the temperature range"
+      write(*,*) "From(default=100.D0)"
+      read(*,*) init_temp
+      write(*,*) "To(default=1500.D0)"
+      read(*,*) final_temp
+      if(init_temp.eq.final_temp)then
+        delta_temp=0.D0
+      else
+14      write(*,*) "Please input the interval of the temperature"
+        write(*,*) "(default=100.D0)"
+        read(*,*) delta_temp
+        if(delta_temp.eq.0.D0.and.(final_temp-init_temp).ne.0.D0)then
+          write(*,*) "Warning!This intervel of temperature will cause 
+     &incorrect ensemble!"
+          write(*,*) "Please try again!"
+          write(*,*) "You could use default value."
+          goto 14
+        endif
+      endif
+      if(delta_temp.eq.0.D0.and.(final_temp-init_temp).eq.0.D0)then
+        delta_temp=1.D0
+        ensemble_num=1
+      else
+        ensemble_num=dint((final_temp-init_temp)/delta_temp)+1
+      endif
+      write(*,*) "The ensemble number is ",ensemble_num
+      write(*,*) 
+      write(*,*) "Please input the PTMC Step"
+      write(*,*) "From(default=1.D0)"
+      read(*,*) init_loop
+      write(*,*) "To(default=1.D8)"
+      read(*,*) final_loop
+      write(*,*) 
+     &"And set the breaking point every N steps"
+      write(*,*)"for checking acceptance ratio(default=1.D6)"
+      write(*,*) "N="
+      read(*,*) break_loop
+      write(*,*) "Backup restoring data at breaking point?(y/n)"
+      read(*,*) yn
+      if(yn.eq."y")then
+        PTMC_restore=.true.
+      else 
+        PTMC_restore=.false.
+      endif
+      write(*,*) "Please input the acceptance ratio(default=0.5)"
+      read(*,*) PTMC_acceptance_ratio
+      write(*,*) "0.Fix all for each node"
+      write(*,*) "1.Fix temperature for each node"
+      write(*,*) "2.Fix moving length for each node"
+      write(*,*) "(default=1)"
+      read(*,*) yn
+      if(yn.eq."0")then
+        PTMC_fix_temp=1
+        PTMC_fix_step=1
+        PTMC_temp_ratio=1.05
+        PTMC_step_ratio=1.05
+      else if(yn.eq."2")then
+        PTMC_fix_temp=0
+        PTMC_fix_step=1
+        PTMC_step_ratio=1.05
+        write(*,*) "Please input the ratio of the temperature change"
+        write(*,*) "(default=1.05)"
+        read(*,*) PTMC_temp_ratio
+      else
+        PTMC_fix_temp=1
+        PTMC_fix_step=0
+        PTMC_temp_ratio=1.05
+        write(*,*) "Please input the ratio of the moving length change"
+        write(*,*) "(default=1.05)"
+        read(*,*) PTMC_step_ratio
+      endif
+      call edit_step_move
+      write(*,*) 
+      return
+      end
+
+      subroutine write_PTMC
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/pes.h"
+      include "../../include/file.h"
+      include "../../include/life.h"
+      include "../../include/job.h"
+      include "../../include/ensemble.h"
+      include "../../include/PTMC/PTMC.h"
+      include "../../include/step_move/step_move.h"
+      integer backup_restoring_point_flag
+      if(PTMC_restore)then
+        backup_restoring_point_flag=1
+      else
+        backup_restoring_point_flag=0
+      endif
+      file_name=file_path(:index(file_path," ")-1)//"tmp."//job_file
+      open(20,file=file_name,access="append")
+      write(20,"(A10,1x,F7.2,
+     &1x,A11,1x,F7.2,
+     &1x,A6,1x,F6.2,
+     &1x,A10,1x,F13.1,
+     &1x,A11,1x,F13.1,
+     &1x,A11,1x,F13.1,
+     &1x,A8,1x,I2,
+     &1x,A8,1x,F5.3,
+     &1x,A6,1x,I2,
+     &1x,A6,1x,F5.3,
+     &1x,A6,1x,I2,
+     &1x,A6,1x,F5.3,
+     &(9(1x,A4,1x,F3.1)))")
+     &"init_temp=",init_temp,
+     &"final_temp=",final_temp,
+     &"dTemp=",delta_temp,
+     &"init_loop=",init_loop,
+     &"final_loop=",final_loop,
+     &"break_loop=",break_loop,
+     &"restore=",backup_restoring_point_flag,
+     &"raccept=",PTMC_acceptance_ratio,
+     &"ftemp=",PTMC_fix_temp,
+     &"rtemp=",PTMC_temp_ratio,
+     &"fstep=",PTMC_fix_step,
+     &"rstep=",PTMC_step_ratio,
+     &"mva=",mva,
+     &"mvb=",mvb,
+     &"mvc=",mvc,
+     &"mvd=",mvd,
+     &"mve=",mve,
+     &"mvf=",mvf,
+     &"mvg=",mvg,
+     &"mvh=",mvh,
+     &"mvi=",mvi
+      close(20)
+      return
+      end
+

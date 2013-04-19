@@ -1,0 +1,202 @@
+*========================================================================
+* File Name : header.f
+* Copyright (C) 2008-2011 Po-Jen Hsu <xanadu8850@pchome.com.tw>
+* Creation Date : 14-09-2010
+* Last Modified : Fri 17 Sep 2010 05:37:31 PM CST
+* License : GPL (see bottom)
+* Encoding : utf-8
+* Project : sophAi
+* Description : header information for ouput files
+*========================================================================
+
+      subroutine creat_formatted_header(file_name)
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/header.h"
+      open(21,file=file_name,status="replace")
+      I0=header_par_num
+      write(21,
+C    &"(A1,1X,A3,1X,I3,100(1X,A25,1X,F15.6),1X,A80)")
+     &*)
+     &"# ",header_source_type," ",header_par_num,
+     &(" ",header_par_name(I0)," ",header_par_real(I0),
+     &I0=1,header_par_num)," ",header_annotation
+      close(21)
+C      write(*,*)
+C     &(header_par_name(I0),header_par_real(I0),I0=1,header_par_num)
+      return
+      end
+
+      subroutine read_formatted_header(file_name,read_header) !read header must leave a space
+!     Read a parameter one at a time. The parameter will be covered only if the read_header for this parameter is assigned.
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/header.h"
+      character read_header*25,header*25
+      character dummy1*1,dummy2*3
+      integer dummy3
+      open(21,file=file_name,status="old")
+      read(21,*)dummy1,header_source_type,header_par_num
+      rewind(21)
+      read(21,*)dummy1,dummy2,dummy3,
+     &(header_par_name(I0),header_par_real(I0),I0=1,header_par_num),
+     &header_annotation
+      close(21)
+      header=read_header(:index(read_header," ")-1)
+      if(header.eq."source_type")then
+        source_type=header_source_type
+        return
+      endif
+      if(header.eq."annotation")then
+       file_annotation=header_annotation
+       return
+      endif
+      do I1=1,header_par_num
+        if(header_par_name(I1).eq.header.and.
+     &header.eq."time_label")then
+          time_label=header_par_real(I1)
+          return
+        endif
+        if(header_par_name(I1).eq.header.and.
+     &header.eq."pes_id")then
+          pes_id=dint(header_par_real(I1))
+          return
+        endif
+        if(header_par_name(I1).eq.header.and.
+     &header.eq."file_x_dim")then
+          file_x_dim=dint(header_par_real(I1))
+          return
+        endif
+        if(header_par_name(I1).eq.header.and.
+     &header.eq."file_y_dim")then
+          file_y_dim=dint(header_par_real(I1))
+          return
+        endif
+      enddo
+      return
+      end
+
+      subroutine creat_unformatted_header(file_name,source_file_type,
+     &total_frame_num)  !Write the information in the first line of unformatted file.
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/BIMD/BIMD.h"
+      include "../include/PTMC/PTMC.h"
+      integer total_frame_num
+      character source_file_type*3
+      open(20,file=file_name,form="unformatted",status="replace")
+      write(20)
+     &"# ",source_file_type,time_label,
+     &"ndim",ndim,
+     &"total_frame",total_frame_num,
+     &"init_loop",init_loop,
+     &"final_loop",final_loop,
+     &"dTime",BIMD_delta_time,
+     &"reset_thermal",BIMD_reset_thermal,
+     &"rec_method",BIMD_record_method,
+     &"rec_interval",BIMD_rec_interval,
+     &"min_PES_method",BIMD_min_PES_method
+      close(20)
+      return
+      end
+
+      subroutine read_unformatted_header(file_name,
+     &total_frame_num,read_header)  !Read the information in the first line of unformatted file and update the value assigned by read_parameter.
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/file.h"
+      include "../include/pes.h"
+      include "../include/BIMD/BIMD.h"
+      include "../include/PTMC/PTMC.h"
+      integer total_frame_num
+      character header*20,read_header*20
+     &,dummy_head*2,
+     &read_source_type*3,
+     &dummy_ndim*4,
+     &dummy_total_frame*11,
+     &dummy_init_loop*9,
+     &dummy_final_loop*10,
+     &dummy_dTime*5,
+     &dummy_reset_thermal*13,
+     &dummy_rec_method*10,
+     &dummy_rec_interval*12,
+     &dummy_min_PES_method*14
+      integer read_ndim,
+     &read_total_frame_num
+      real*8 read_time_label,read_init_loop,
+     &read_final_loop,
+     &read_BIMD_delta_time
+      integer read_BIMD_reset_thermal,
+     &read_BIMD_record_method
+      real*8 read_BIMD_rec_interval
+      integer read_BIMD_min_PES_method
+      open(20,file=file_name,form="unformatted",status="old")
+      read(20)
+     &dummy_head,
+     &read_source_type,read_time_label
+     &,dummy_ndim,read_ndim
+     &,dummy_total_frame,total_frame_num
+     &,dummy_init_loop,read_init_loop
+     &,dummy_final_loop,read_final_loop
+     &,dummy_dTime,read_BIMD_delta_time
+     &,dummy_reset_thermal,read_BIMD_reset_thermal
+     &,dummy_rec_method,read_BIMD_record_method
+     &,dummy_rec_interval,read_BIMD_rec_interval
+     &,dummy_min_PES_method,read_BIMD_min_PES_method
+      close(20)
+C      write(*,*)
+c     &dummy_head,read_source_type,read_time_label,
+C     &dummy_ndim,read_ndim,
+C     &dummy_total_frame,total_frame_num,
+C     &dummy_init_loop,read_init_loop,
+C     &dummy_final_loop,read_final_loop,
+C     &dummy_dTime,read_BIMD_delta_time,
+C     &dummy_reset_thermal,read_BIMD_reset_thermal,
+C     &dummy_rec_method,read_BIMD_record_method,
+C     &dummy_rec_interval,read_BIMD_rec_interval,
+C     &dummy_min_PES_method,read_BIMD_min_PES_method
+      header=read_header(:index(read_header," ")-1)
+      if(header.eq."source_type")source_type=read_source_type
+      if(header.eq."ndim")ndim=read_ndim
+      if(header.eq."init_loop")init_loop=read_init_loop
+      if(header.eq."final_loop")final_loop=read_final_loop
+      if(header.eq."BIMD_delta_time")BIMD_delta_time=
+     &read_BIMD_delta_time
+      if(header.eq."BIMD_reset_thermal")BIMD_reset_thermal=
+     &read_BIMD_reset_thermal
+      if(header.eq."BIMD_record_method")BIMD_record_method=
+     &read_BIMD_record_method
+      if(header.eq."BIMD_rec_interval")BIMD_rec_interval=
+     &read_BIMD_rec_interval
+      if(header.eq."BIMD_min_PES_method")BIMD_min_PES_method=
+     &read_BIMD_min_PES_method
+      return
+      end
+
+
+
+* ======================GNU General Public License=======================
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+* 
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+* =======================================================================

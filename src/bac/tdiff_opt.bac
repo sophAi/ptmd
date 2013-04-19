@@ -1,0 +1,126 @@
+      subroutine tdiff(QP,QPDOT)
+C=========================================================================
+C THIS SUBROUTINE COMPUTES THE R.H. SIDE OF THE EQUATIONS OF MOTION.
+C Optimized by Po-Jen, Hsu 2008/10/23
+C=========================================================================
+      implicit none
+      include "../include/global_common.h"
+      include "../include/common.h"
+      include "../include/pes.h"
+      include "../include/BIMD/BIMD.h"
+C=======================LOCAL VARIABLES===============================
+      real*8 px_over_p0,py_over_P0,pz_over_P0,QP(q_max),QPDOT(q_max)
+      real*8 PX1_over_DP0,PX1_DP0_over_mass,PX2_over_DP02,PX2_over_mass
+     &,PX3_over_mass_DP0,PX4_over_mass_DP02
+      real*8 PY1_over_DP0,PY1_DP0_over_mass,PY2_over_DP02,PY2_over_mass
+     &,PY3_over_mass_DP0,PY4_over_mass_DP02
+      real*8 PZ1_over_DP0,PZ1_DP0_over_mass,PZ2_over_DP02,PZ2_over_mass
+     &,PZ3_over_mass_DP0,PZ4_over_mass_DP02
+C=======================BINNING STAFF==================================
+C 1~N1      = x(i)
+C N1+1~N2   = y(i)
+C N2+1~N3   = z(i)
+C N3+1~N4   = Px(i)
+C N4+1~N5   = Py(i)
+C N5+1~N6   = Pz(i)
+C N6+1~N6+9 = factor of Mu,Nu, and eta
+      PX1_over_DP0=0.0D0      ! Px^1/P0
+      PX1_DP0_over_mass=0.D0  ! Px^1*P0/mass
+      PX2_over_DP02=0.0D0      ! Px^2/P0^2
+      PX2_over_mass=0.D0       ! Px^2/m
+      PX3_over_mass_DP0=0.0D0      ! Px^3/(m*P0)
+      PX4_over_mass_DP02=0.0D0      ! Px^4/(m*P0^2)
+
+      PY1_over_DP0=0.0D0      ! Py^1/P0
+      PY1_DP0_over_mass=0.D0  ! Py^1*P0/m
+      PY2_over_DP02=0.0D0      ! Py^2/P0^2
+      PY2_over_mass=0.D0       ! Py^2/m
+      PY3_over_mass_DP0=0.0D0      ! Py^3/(m*P0)
+      PY4_over_mass_DP02=0.0D0      ! Py^4/(m*P0^2)
+
+      PZ1_over_DP0=0.0D0      ! Pz^1/P0
+      PZ1_DP0_over_mass=0.D0  ! Pz^1*P0/m
+      PZ2_over_DP02=0.0D0      ! Pz^2/P0^2
+      PZ2_over_mass=0.D0       !Pz^2/m
+      PZ3_over_mass_DP0=0.0D0      ! Pz^3/(m*p0)
+      PZ4_over_mass_DP02=0.0D0      ! Pz^4/(m*P0^2)
+C================x_dot and p_dot=============================
+      do J1=1,N1       !x=x4
+        J2=J1*3
+        x(J2-2)=QP(J1)
+        x(J2-1)=QP(J1+N1)
+        x(J2)=QP(J1+N1*2)
+      enddo
+      call pes
+      do J0=1,N1                 ! x_dot(i),y_dot(i),z_dot(i)=vx,vy,vz
+        px_over_p0=QP(N3+J0)*I_DP0(J0)       !Px(i)/P0
+        py_over_P0=QP(N4+J0)*I_DP0(J0)       !Py(i)/P0
+        pz_over_P0=QP(N5+J0)*I_DP0(J0)       !Pz(i)/P0
+        QPDOT(J0)=tmass(J0)*QP(N3+J0)        !Vx(i)=x_dot(i)=Px(i)/m(i)
+        QPDOT(N1+J0)=tmass(J0)*QP(N4+J0)     !Vy(i)=y_dot(i)=Py(i)/m(i)
+        QPDOT(N2+J0)=tmass(J0)*QP(N5+J0)     !Vz(i)=z_dot(i)=Pz(i)/m(i)
+        QPDOT(N3+J0)=-grad(J0*3-2)+p_factor(J0)*
+     &(QP(N6+1)**3*px_over_p0+QP(N6+2)*(px_over_p0**2-DA0)+
+     &p_factor(J0)*QP(N6+3)*px_over_p0**3)                   !Px_dot(i)
+        QPDOT(N4+J0)=-grad(J0*3-1)+p_factor(J0)*
+     &(QP(N6+4)**3*py_over_p0+QP(N6+5)*(py_over_p0**2-DA0)+
+     &QP(N6+6)*py_over_p0**3)                   !Py_dot(i)
+        QPDOT(N5+J0)=-grad(J0*3)+p_factor(J0)*
+     &(QP(N6+7)**3*pz_over_p0+QP(N6+8)*(pz_over_p0**2-DA0)+
+     &QP(N6+9)*pz_over_p0**3)                  !Pz_dot(i)
+C=============Pseudo friction=================================
+        PX1_over_DP0=PX1_over_DP0+QP(N3+J0)*I_DP0(J0)      !sum of momentum Px^1,Px^2,Px^3,Px^4
+        PX1_DP0_over_mass=PX1_DP0_over_mass+QP(N3+J0)*DP0_over_mass(J0)
+        PX2_over_DP02=PX2_over_DP02+QP(N3+J0)**2*I_DP02(J0)
+        PX2_over_mass=PX2_over_mass+QP(N3+J0)**2*tmass(J0)
+        PX3_over_mass_DP0=PX3_over_mass_DP0+QP(N3+J0)**3*I_DP0_mass(J0)
+        PX4_over_mass_DP02=PX4_over_mass_DP02+QP(N3+J0)**4*
+     &I_DP02_mass(J0)
+        PY1_over_DP0=PY1_over_DP0+QP(N4+J0)*I_DP0(J0)      !sum of momentum Py^1,Py^2,Py^3,Py^4
+        PY1_DP0_over_mass=PY1_DP0_over_mass+QP(N4+J0)*DP0_over_mass(J0)
+        PY2_over_DP02=PY2_over_DP02+QP(N4+J0)**2*I_DP02(J0)
+        PY2_over_mass=PY2_over_mass+QP(N4+J0)**2*tmass(J0)
+        PY3_over_mass_DP0=PY3_over_mass_DP0+QP(N4+J0)**3*I_DP0_mass(J0)
+        PY4_over_mass_DP02=PY4_over_mass_DP02+QP(N4+J0)**4*
+     &I_DP02_mass(J0)
+        PZ1_over_DP0=PZ1_over_DP0+QP(N5+J0)*I_DP0(J0)      !sum of momentum Pz^1,Pz^2,Pz^3,Pz^4
+        PZ1_DP0_over_mass=PZ1_DP0_over_mass+QP(N5+J0)*DP0_over_mass(J0)
+        PZ2_over_DP02=PZ2_over_DP02+QP(N5+J0)**2*I_DP02(J0)
+        PZ2_over_mass=PZ2_over_mass+QP(N5+J0)**2*tmass(J0)
+        PZ3_over_mass_DP0=PZ3_over_mass_DP0+QP(N5+J0)**3*I_DP0_mass(J0)
+        PZ4_over_mass_DP02=PZ4_over_mass_DP02+QP(N5+J0)**4*
+     &I_DP02_mass(J0)
+      enddo
+      QPDOT(N6+1)=pseudo_factor*(PX2_over_mass*I_NT-1.D0)
+      QPDOT(N6+4)=pseudo_factor*(PY2_over_mass*I_NT-1.D0)     
+      QPDOT(N6+7)=pseudo_factor*(PZ2_over_mass*I_NT-1.D0)
+
+      QPDOT(N6+2)=pseudo_factor*(PX3_over_mass_DP0*I_NT-
+     &PX1_DP0_over_mass*d0_over_NT-PX1_over_DP0*I_N_over_2)
+      QPDOT(N6+5)=pseudo_factor*(PY3_over_mass_DP0*I_NT-
+     &PY1_DP0_over_mass*d0_over_NT-PY1_over_DP0*I_N_over_2)
+      QPDOT(N6+8)=pseudo_factor*(PZ3_over_mass_DP0*I_NT-
+     &PZ1_DP0_over_mass*d0_over_NT-PZ1_over_DP0*I_N_over_2)
+
+      QPDOT(N6+3)=pseudo_factor*(PX4_over_mass_DP02*I_NT-
+     &PX2_over_DP02*I_N_over_3)
+      QPDOT(N6+6)=pseudo_factor*(PY4_over_mass_DP02*I_NT-
+     &PY2_over_DP02*I_N_over_3)
+      QPDOT(N6+9)=pseudo_factor*(PZ4_over_mass_DP02*I_NT-
+     &PZ2_over_DP02*I_N_over_3)
+C      S=kinetic_per_dim/DP0/DL0
+C      A1=alpha*S
+C      A2=beta*S
+C      A3=chi*S
+C      A4=TMASS*NI/T1
+C      QPDOT(N6+1)=A1*(PX2*A4-1.0D0)       ! 9 PESUDO-COEFIICIENT
+C      QPDOT(N6+2)=A2*(PX3*A4/DP0-DA0*DP0*PX1*A4-2.0D0*NI*PX1/DP0)
+C      QPDOT(N6+3)=A3*(PX4*A4/DP0**2-3.0D0*NI*PX2/DP0**2)
+C      QPDOT(N6+4)=A1*(PY2*A4-1.0D0)
+C      QPDOT(N6+5)=A2*(PY3*A4/DP0-DA0*DP0*PY1*A4-2.0D0*NI*PY1/DP0)
+C      QPDOT(N6+6)=A3*(PY4*A4/DP0**2-3.0D0*NI*PY2/DP0**2)
+C      QPDOT(N6+7)=A1*(PZ2*A4-1.0D0)
+C      QPDOT(N6+8)=A2*(PZ3*A4/DP0-DA0*DP0*PZ1*A4-2.0D0*NI*PZ1/DP0)
+c      QPDOT(N6+9)=A3*(PZ4*A4/DP0**2-3.0D0*NI*PZ2/DP0**2)
+      return
+      end

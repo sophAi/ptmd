@@ -1,0 +1,134 @@
+      subroutine edit_BIMD
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/pes.h"
+      include "../../include/file.h"
+      include "../../include/job.h"
+      include "../../include/ensemble.h"
+      include "../../include/BIMD/BIMD.h"
+99    format(I5,1x,A12,A3)
+100   format(A10,1x,I5,1x,A3,1x,A5,1x,I5,1x,A3)
+      character yn*1
+      write(*,*) "<<<<BIMD MENU>>>>"
+      call edit_temp
+      write(*,*) 
+      write(*,*) "Please input the starting point of the loop"
+      write(*,*) "For recording xyz,1.D6 for total loop is recommended"
+      write(*,*) "From(default=1.D0)"
+      read(*,*) init_loop
+      write(*,*) "To(default=1.D8)"
+      read(*,*) final_loop
+      if(mod(init_loop,1000.D0).eq.0.D0.
+     &and.mod(final_loop,1000.D0).eq.0)then
+        write(*,*) "<<REMINDER>>"
+        write(*,*) "PJ:It seems that your total time step is ",
+     &final_loop-init_loop+1.D0
+        write(*,*) "not ",final_loop-init_loop
+        write(*,*) 
+     &"And for the 1.D6 restoring interval,it will read the restoring"
+        write(*,*)"at ",init_loop,"-1.D6 or 0"
+        write(*,*)"which may cause the computing time longer"
+        write(*,*)
+     &"Would you like me to add 1 step for your initial time(y/n)"
+        read(*,*)yn 
+        if(yn.eq."y")then
+          init_loop=init_loop+1
+          write(*,*) "Your initial time is ",init_loop
+          write(*,*)"And your total time step will be ",
+     &final_loop-init_loop+1.D0 
+        endif
+      endif
+      write(*,*) "Please input the deltaT(time interval in pico second)"
+      write(*,*) "(default=0.001D0)"
+      read(*,*) delta_time
+      write(*,"(A21,1x,F12.8,1x,A19)") 
+     &"The time interval is ",delta_time,"pico second(10^-12s)"
+      write(*,"(A28,1x,F30.20,1x,A6,1x,F15.8,1x,A19)") 
+     &"The real simulation time is ",
+     &(final_loop-init_loop+1.D0)*delta_time*1.D-12,"sec or",
+     &(final_loop-init_loop+1.D0)*delta_time,"pico second(10^-12s)"
+      if(init_loop.eq.1.D0)then
+        BIMD_reset_thermal=.true.
+      else
+        write(*,"(A48)")
+     &"1.Calculate thermal quantities from the 1st step"
+        write(*,"(A39,1x,F13.1,1x,A8)") 
+     &"2.Calculate thermal quantities from the",init_loop,"'th step"
+        read(*,*) yn
+        if(yn.eq."1")then
+          BIMD_reset_thermal=.false.
+        else
+          BIMD_reset_thermal=.true.
+        endif
+      endif
+      write(*,*) "Please select the recording method"
+      write(*,*) "0.Record nothing"
+      write(*,*) "1.Record restoring points only"
+      write(*,*) "2.Record xyz data only"
+      write(*,*) "3.Record usr data only"
+      write(*,*) "4.Record CN data only"
+      write(*,*) "5.Record ANL data only"
+      write(*,*) "6.Record CN and ANL data" 
+      write(*,*) "7.Record usr,CN, ANL and xyz data"
+      read(*,*) BIMD_record_method
+      if(BIMD_record_method.ne.1.and.BIMD_record_method.ne.0)then
+        write(*,*) "Record data every N steps(default=1)"
+        write(*,*) "N="
+        read(*,*) BIMD_rec_interval
+        write(*,"(A47,F10.6)") 
+     &" When you calculate VACF,your time_interval is ",
+     &dble(BIMD_rec_interval)*dble(delta_time)
+      else if(BIMD_record_method.eq.1)then
+        write(*,*) 
+     &"Backup restoring point every N steps (default=1.D6)"
+        write(*,*) "N="
+        read(*,*) BIMD_rec_interval
+      else if(BIMD_record_method.eq.0)then
+        BIMD_rec_interval=final_loop+10
+      endif
+      write(*,*) "Please select the minimization method "
+      write(*,*) "in BIMD"
+      write(*,*) "0.Minimize nothing"
+      write(*,*) "1.LBFGS method"
+      write(*,*) "2.Simplex method"
+      read(*,*) min_PES_method
+      write(*,*) 
+      return
+      end
+
+      subroutine write_BIMD
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/pes.h"
+      include "../../include/file.h"
+      include "../../include/life.h"
+      include "../../include/job.h"
+      include "../../include/ensemble.h"
+      include "../../include/BIMD/BIMD.h"
+      integer record_xyz_flag,reset_thermal_flag
+      if(BIMD_reset_thermal)then
+        reset_thermal_flag=1
+      else
+        reset_thermal_flag=0
+      endif
+      file_name=file_path(:index(file_path," ")-1)//"tmp."//job_file
+      open(20,file=file_name,access="append")
+      write(20,"(A10,1x,F7.2,1x,A11,1x,F7.2,1x,A6,1x,
+     &F7.2,1x,A10,1x,F13.1,1x,A11,1x,F13.1,1x,A6,1x,F10.7,
+     &1x,A14,1x,I1,1x,A11,1x,I2,1x,A13,1x,F13.1,1x,A15,1x,I2)")
+     &"init_temp=",init_temp,
+     &"final_temp=",final_temp,
+     &"dTemp=",delta_temp,
+     &"init_loop=",init_loop,
+     &"final_loop=",final_loop,
+     &"dTime=",delta_time,
+     &"reset_thermal=",reset_thermal_flag,
+     &"rec_method=",BIMD_record_method,
+     &"rec_interval=",BIMD_rec_interval,
+     &"min_PES_method=",min_PES_method
+      close(20)
+      return
+      end
+

@@ -1,0 +1,159 @@
+      subroutine BIMD
+C================Input parameters======================================
+C global_energy,initial x,v,delta_time,delta_temp,init_loop,final_loop,equ_loop,mass_a,mass_b,atom_num,atom_num_a,ndim
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/file.h"
+      include "../../include/BIMD/BIMD.h"
+      include "../../include/BIMD/BIMD_restore.h"
+      include "../../include/pes.h"
+      integer init_loop_int,final_loop_int,min_PES_org
+      integer total_record_xyz_num,BIMD_rec_interval_int
+      real*8 xc,xcp
+      real*8 fm(q_max),ym(q_max)
+      real*8 temper_step
+      call min_PES
+      if(BIMD_record_method.eq.3.or.BIMD_record_method.eq.7)then
+        call clean_file(BIMD_usr_file)
+        if(wscreen)write(*,"(I5,1x,A32)")
+     &myid,"Erase the corresponding usr file"
+      endif
+      if(BIMD_record_method.eq.2.or.BIMD_record_method.eq.7)then
+        call clean_file(BIMD_pes_file)
+        if(wscreen)write(*,"(I5,1x,A32)")
+     &myid,"Erase the corresponding xyz file"
+      endif
+      if(BIMD_record_method.eq.4.or.BIMD_record_method.eq.6
+     &.or.BIMD_record_method.eq.7)then
+        call clean_file(BIMD_cn_file)
+        if(wscreen)write(*,"(I5,1x,A31)")
+     &myid,"Erase the corresponding usr file"
+      endif
+      if(BIMD_record_method.eq.5.or.BIMD_record_method.eq.6
+     &.or.BIMD_record_method.eq.7)then
+        call clean_file(BIMD_anl_file)
+        if(wscreen)
+     &write(*,"(I5,1x,A32)")myid,"Erase the corresponding anl file"
+      endif
+      total_record_xyz_num=((dint(final_loop)-
+     &dint(init_loop))+1)/dint(BIMD_rec_interval)
+      BIMD_rec_interval_int=dint(BIMD_rec_interval)
+      init_loop_int=dint(init_loop)
+      final_loop_int=dint(final_loop)
+C================Start BIMD Loop========================================
+      if(wscreen) write(*,"(I5,1x,A15,1x,F13.1,1x,A2,1x,F13.1)")
+     &myid,"Start BIMD from",init_loop,"to",final_loop
+C=======================================================================
+      if(BIMD_record_method.eq.1)then
+        if(wscreen)write(*,"(I5,1x,A30)")
+     &myid,"Start writing restoring points"
+        call BIMD_history(BIMD_restore_history,1,"app","min")
+        call BIMD_backup(1)
+      endif    
+C=============Start BIMD================================================
+      do I1=init_loop_int,final_loop_int
+C-----------------------------------------------------------------------C
+C THE FOLLOWING IS THE HAMMING SCHEME TO INTEGRATE A SET OF 1ST ORDER   C
+C  DIFFERENTIAL EQUATIONS.                                              C
+C-----------------------------------------------------------------------C
+        do J3=1,q_dim
+          q(J3)=yk3(J3)+a1*(fk0(J3)-0.5D0*fk1(J3)+fk2(J3))
+          ym(J3)=q(J3)+a2*ycp(J3)
+        enddo
+        CALL TDIFF(ym,fm)
+        do J1=1,q_dim
+          xc=a3*(a4*yk0(J1)-yk2(J1))+a5*(fm(J1)+2.0D0*fk0(J1)-fk1(J1))
+          xcp=xc-q(J1)
+          xc=xc+a6*xcp
+          q(J1)=xc                        !  fifth point as first point
+          ycp(J1)=xcp                     ! Necessary elements for the iteration: yk0,yk2,fk0,fk1,
+          fk2(J1)=fk1(J1)
+          fk1(J1)=fk0(J1)
+          yk3(J1)=yk2(J1)
+          yk2(J1)=yk1(J1)
+          yk1(J1)=yk0(J1)
+          yk0(J1)=xc
+        enddo
+C=============send back x and v===========================
+        do J1=1,atom_num
+          J2=J1*3
+          x(J2-2)=q(J1)
+          x(J2-1)=q(J1+atom_num)
+          x(J2)=q(J1+atom_num*2)
+          v(J2-2)=q(J1+atom_num*3)/mass(J1)
+          v(J2-1)=q(J1+atom_num*4)/mass(J1)
+          v(J2)=q(J1+atom_num*5)/mass(J1)
+        enddo
+C==============End of sending back x and v========================
+        CALL TDIFF(q,fk0)
+C====================End of Differential Equation,generate x and v =======
+        do J1=1,atom_num
+          do J3=1,atom_num
+            if(J3.ne.J1) then   
+              BIMD_ave_dist(J1,J3)=BIMD_ave_dist(J1,J3)+dist(J1,J3)
+              BIMD_ave_dist2(J1,J3)=BIMD_ave_dist2(J1,J3)+dist(J1,J3)**2
+            endif
+          enddo
+        enddo 
+        kinetic=0.D0
+        do J1=1,atom_num
+          kinetic=kinetic+(q(j1+atom_num*3)**2+
+     &q(J1+atom_num*4)**2+q(J1+atom_num*5)**2)/(2D0*mass(J1))
+        enddo
+        mean_kinetic_per_atom=kinetic/dble(atom_num)    !    unit ev
+        mean_pot_per_atom=pot/dble(atom_num)
+        mean_energy_per_atom=mean_pot_per_atom+mean_kinetic_per_atom
+C    &-mean_global_pot
+        temper_step=0.D0
+        do J1=1,atom_num
+          J2=J1*3
+          temper_step=temper_step+
+     &mass(J1)*(v(J2-2)**2+v(J2-1)**2+v(J2)**2)
+        enddo
+        temper_step=temper_step/(dble(atom_num)*kb*3D0)  !Check
+        BIMD_ave_energy=BIMD_ave_energy+mean_energy_per_atom
+        BIMD_ave_energy_square=BIMD_ave_energy_square+
+     &(mean_energy_per_atom)**2
+        BIMD_ave_pot=BIMD_ave_pot+mean_pot_per_atom
+        BIMD_ave_kinetic=BIMD_ave_kinetic+mean_kinetic_per_atom
+        BIMD_ave_temper=BIMD_ave_temper+temper_step
+C===========Start of Restoring Points or recording xyz==============================
+C        if(I1.gt.446820)then 
+C          do J1=1,ndim
+C          write(*,"I8,3(F15.9)") I1,pot,x(J1),grad(J1)
+C          enddo
+C          pause
+C        endif
+        if(mod(I1,BIMD_rec_interval_int).eq.0)then
+          call check_value(pot)
+          if(NaN_flag.or.Inf_flag)then
+            if(wscreen)write(*,*)"NaN at temp=",temp
+            return 
+          else if(BIMD_record_method.eq.2)then        !record xyz data only
+            call write_xyz_file(BIMD_pes_file,"app",I1,
+     &total_record_xyz_num,1)                    
+          else if(BIMD_record_method.eq.3)then   !record usr data and energy only
+            call write_usr(BIMD_usr_file,I1,"app","org")
+          else if(BIMD_record_method.eq.4)then   !record cn data and energy only
+            call BIMD_history(BIMD_cn_file,I1,"app","org")
+          else if(BIMD_record_method.eq.5)then   !record anl data and energy only
+            call write_anl(BIMD_anl_file,I1,"app","org")
+          else if(BIMD_record_method.eq.6)then   !record cn data,anl with energy
+            call write_anl(BIMD_anl_file,I1,"app","org")
+            call BIMD_history(BIMD_cn_file,I1,"app","org")
+          else if(BIMD_record_method.eq.7)then   !record usr,cn data,xyz,anl with energy
+            call write_anl(BIMD_anl_file,I1,"app","org")
+            call write_usr(BIMD_usr_file,I1,"app","org")
+            call BIMD_history(BIMD_cn_file,I1,"app","org")
+            call write_xyz_file(BIMD_pes_file,"app",I1,
+     &total_record_xyz_num,1)
+          else if(BIMD_record_method.eq.1)then   !normal recording restoring points
+            call BIMD_history(BIMD_restore_history,I1,"app","min")
+            call BIMD_backup(I1)
+          endif
+        endif
+C===========End of Restoring Points or recording xyz================================
+      enddo  
+      return
+      end

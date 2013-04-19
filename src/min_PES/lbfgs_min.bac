@@ -1,0 +1,109 @@
+       subroutine LBFGS_init
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/file.h"
+       lbfgs_XTOL=2.2204460492503D-16
+       lbfgs_MP=6
+       lbfgs_LP=6
+       lbfgs_STPMIN=1.D-20
+       lbfgs_STPMAX=1.D+20 
+       lbfgs_MAXIT=500      
+       lbfgs_MUPDATE=4
+       lbfgs_DGUESS=0.1D0
+       lbfgs_GMAX=0.001D0
+       lbfgs_GTOL=0.9D0
+       return
+       end
+
+
+
+*       Conjugate Gradient Driver
+*
+       subroutine LBFGS_min
+       implicit none
+       include "../include/global_common.h"
+       include "../include/common.h"
+       include "../include/file.h"
+       include "../include/pes.h"
+       integer IFLAG,NMUPMAX
+       integer IPRINT(2)
+       parameter(NMUPMAX=4)
+       real*8 WORK(ndim_max*(2*NMUPMAX+1)+2*NMUPMAX)
+       real*8 DIAG(ndim_max),last_pot(500),last_rms(500),last_IFLAG(500)
+       real*8 pot_bac,x_bac(ndim_max),grad_bac(ndim_max),
+     &pot_per_atom_bac(ndim_max),RMS_bac
+       character dummy*2
+       IFLAG=1
+       evap=.false.
+       IPRINT(1)=-1
+       IPRINT(2)=0 
+       call pes
+       pot_bac=pot
+       RMS_bac=RMS
+       do J1=1,ndim
+         x_bac(J1)=x(J1)
+         grad_bac(J1)=grad(J1)
+       enddo
+       do J1=1,atom_num
+         pot_per_atom_bac(J1)=pot_per_atom(J1)
+       enddo
+       do I0=1,lbfgs_MAXIT
+         if(RMS.le.lbfgs_GMAX)then
+           lbfgs_EPS=RMS
+         else
+           lbfgs_EPS=lbfgs_GMAX
+         endif
+         last_pot(I0)=pot
+         last_rms(I0)=rms
+         last_IFLAG(I0)=IFLAG
+101      call lbfgs(ndim,lbfgs_MUPDATE,x,pot,grad,
+     &.FALSE.,DIAG,IPRINT,lbfgs_EPS,lbfgs_XTOL,WORK,IFLAG,lbfgs_DGUESS)
+         call pes
+         write(*,*) I0,pot,IFLAG
+         if(evap.or.pot.eq."NaN".or.dabs(pot).eq."INF")then
+           if(wscreen)write(*,"I5,1x,A23,1x,F20.8,1x,
+     &F20.8,1x,F20.8,1x,I5,1x,F20.8") 
+     &myid,",lbfgs false,evap! Pot=",pot,RMS,pot_bac,I0,
+     &global_pot
+           lbfgs_converge=.false.
+           evap=.false.
+           POT=POT_BAC
+           RMS=RMS_BAC
+           do J1=1,NDIM
+             x(J1)=x_bac(J1)
+             grad(J1)=grad_bac(J1)
+           enddo
+           do J1=1,atom_num
+             pot_per_atom_bac(J1)=pot_per_atom(J1)
+           enddo
+           write(*,*) "before reset,pot=",pot,rms,IFLAG
+           call pes
+           write(*,*) "Check pot again=",pot,rms,IFLAG
+           call lbfgs(ndim,lbfgs_MUPDATE,x,pot,grad,
+     &.FALSE.,DIAG,IPRINT,lbfgs_EPS,lbfgs_XTOL,WORK,IFLAG,lbfgs_DGUESS)
+           call pes
+           write(*,*) "After reset,pot=",pot,rms,IFLAG
+           pause
+           goto 101
+C-================================
+         endif 
+         if (IFLAG.eq.0) then
+           lbfgs_converge=.TRUE.
+C            if(wscreen)write(*,"I5,1x,I5,1x,A14,1x,F20.8,1x,
+C     &F20.8,1x,F20.8")
+C     &myid,I0,",lbfgs OK, Pot=",pot,RMS,global_pot
+C            pause
+            return
+         else if (IFLAG.lt.0) then
+           lbfgs_converge=.FALSE.
+C           if(wscreen)write(*,"I5,1x,I5,1x,A18,1x,F20.8,1x,
+C     &F20.8,1x,F20.8") 
+C     &myid,I0,",lbfgs false, Pot=",pot,RMS,global_pot
+C           pause 
+           return
+         endif
+         call flush(6)
+       enddo
+       return
+       end

@@ -1,0 +1,51 @@
+      subroutine BIMD_thermal
+      implicit none
+      include "../../include/global_common.h"
+      include "../../include/common.h"
+      include "../../include/file.h"
+      include "../../include/BIMD/BIMD.h"
+      include "../../include/BIMD/BIMD_restore.h"
+      include "../../include/pes.h"
+      real*8 total_loop
+      real*8 total_i_bond(atom_num_max),
+     &total_bond,bond(atom_num_max,atom_num_max)
+      total_loop=final_loop-start_loop+1.D0
+      BIMD_ave_temper=BIMD_ave_temper/total_loop
+      BIMD_ave_energy=BIMD_ave_energy/total_loop
+      BIMD_ave_pot=BIMD_ave_pot/total_loop
+      BIMD_ave_kinetic=BIMD_ave_kinetic/total_loop
+      BIMD_ave_energy_square=BIMD_ave_energy_square/total_loop
+      BIMD_Cv=((BIMD_ave_energy_square-BIMD_ave_energy**2)*
+     &(dble(atom_num))**2)/((temp*kb)**2)
+      BIMD_Cv=BIMD_Cv/dble(atom_num)
+      do J1=1,atom_num
+        do J3=1,atom_num
+          if(J3.ne.J1)then
+            BIMD_ave_dist(J1,J3)=BIMD_ave_dist (J1,J3)/total_loop
+            BIMD_ave_dist2(J1,J3)=BIMD_ave_dist2(J1,J3)/total_loop
+          endif
+        enddo
+      enddo
+      total_bond=0.D0
+      do J1=1,atom_num
+        total_i_bond(J1)=0.D0
+        do J3=1,atom_num
+          if (J3.ne.J1) then
+            bond(J1,J3)=dsqrt(BIMD_ave_dist2(J1,J3)-
+     &BIMD_ave_dist(J1,J3)**2)
+            bond(J1,J3)= bond(J1,J3)/BIMD_ave_dist(J1,J3)
+            total_i_bond(J1)=total_i_bond(J1)+bond(J1,J3)
+          endif
+        enddo
+        total_bond=total_bond+total_i_bond(J1)
+      enddo
+      BIMD_ave_bond=total_bond*(1.D0/dble(atom_num*(atom_num-1)))
+      if(wscreen)write(*,"(I5,1x,A20,1x,F13.1,1x,A6,1xF5.0,1x,A8,
+     &1x,F15.7,1x,A5,1x,F15.7
+     &,1x,A7,1x,F15.7,1x,A6,1x,F15.7)")
+     &myid,"RESULTS: Total loop=",total_loop,",temp=",temp,
+     0",Cv/Nkb=",BIMD_Cv,",eng=",BIMD_ave_energy,
+     &",eng^2=",BIMD_ave_energy_square,",bond=",BIMD_ave_bond
+      return
+      end
+
